@@ -21,4 +21,8 @@ void loop(){
     Serial.println(timer);
     
 }
+//hello dakness my old friend
 
+void funk(){
+    int hello =12;
+}
