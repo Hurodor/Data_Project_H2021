@@ -23,6 +23,16 @@ void loop(){
 }
 //hello dakness my old friend
 
+<<<<<<< HEAD
 void funk(){
     int hello =12;
 }
+=======
+int test(){
+    int i = 2;
+    int b = 3;
+
+    return i + b; 
+}
+
+>>>>>>> b6918ac632e7dabb48c08439f38cfdb374da08fa
