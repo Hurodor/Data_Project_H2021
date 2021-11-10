@@ -22,3 +22,10 @@ void loop(){
     
 }
 
+int test(){
+    int i = 2;
+    int b = 3;
+
+    return i + b; 
+}
+
