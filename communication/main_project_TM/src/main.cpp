@@ -1,53 +1,72 @@
+//inluded liberaries:
 #include <Arduino.h>
+#include <UbidotsEsp32Mqtt.h>
 
-// Deep sleep with periodic NTP update
-// This example stores a variable in the RTC memory
-// to keep track of the last time NTP was checked
-// Larry Bernstone <lbernstone@gmail.com>
+// included liberaries end:
 
- 
-#include <WiFi.h>
-#include <esp_sleep.h>
 
-#define NTP_CYCLE 3600  // one hour
-#define NTP_TIMEOUT 30  // seconds
-#define TIME_TO_SLEEP 30  // seconds
-#define NTP_SRV "time-a-b.nist.gov"
+//ubidots variables:
+const char *UBIDOTS_TOKEN = "BBFF-O7IdMgAv4p0AzptrTKIQGkQr1jTCZZ";  // Put here your Ubidots TOKEN
+const char *WIFI_SSID = "Hurodor";      // Put here your Wi-Fi SSID
+const char *WIFI_PASS = "123456789";      // Put here your Wi-Fi password
 
-RTC_DATA_ATTR unsigned long lastUpdate = 0;
-const char* ssid = "Kugalskap";
-const char* passwd = "datakom696969";
+// define device and variabelname made in ubidots here:
+const char *DEVICE_LABEL = "Test";   // Put here your Device label to which data  will be published
+const char *VARIABLE_LABEL = "random_value2"; // Put here your Variable label to which data  will be published
 
-void setup() {
-  Serial.begin(115200);
-  unsigned long now = time(NULL);
-  Serial.printf("Now: %lu\nLast Update: %lu\n", now, lastUpdate);
-  if (lastUpdate > now) lastUpdate = 0;
+const int value = 10;
 
-  if ((lastUpdate == 0) || ((now - lastUpdate) > NTP_CYCLE)) { 
-    WiFi.begin(ssid, passwd);
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-      Serial.println("Unable to connect to WiFi");
-      return;
-    }
+unsigned long timer;
 
-    struct tm tm_now;
-    configTime(0, 0, NTP_SRV); //UTC time
-    if (!getLocalTime(&tm_now, NTP_TIMEOUT * 1000ULL)) {
-      Serial.println("Unable to sync with NTP server");
-      return;
-    }
-    lastUpdate = time(NULL);
-    Serial.println("NTP time updated");
-  }
+//testing
+
+
+char context[25];
+unsigned long timestamp = 1635944256;
+
+// initialize ubidots constraint
+Ubidots ubidots(UBIDOTS_TOKEN);
+
+void setup(){
+    Serial.begin(115200);
+    
+    ubidots.connectToWifi(WIFI_SSID, WIFI_PASS);
+    //ubidots.setCallback(callback);
+    ubidots.setup();
+    ubidots.reconnect();
+
+    timer = millis();
 }
 
-void loop() {  
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * 1000000ULL);
-  Serial.println("********");
-  Serial.println(time(NULL));
-  Serial.println("********");
-  Serial.println("Going to sleep now");
-  Serial.flush(); 
-  esp_deep_sleep_start();
+void loop(){
+    if (!ubidots.connected()){
+        ubidots.reconnect();
+    }
+
+    
+    // add value to the spesified label:
+
+    if (millis() >= timer + 5000){
+
+        // making context key value pair
+        ubidots.addContext("test", "10");
+        ubidots.getContext(context);
+        // making payload
+        ubidots.add(VARIABLE_LABEL, value, context, timestamp);
+
+        // sending payload
+        ubidots.publish(DEVICE_LABEL);
+
+        // print statments
+        Serial.print("value: ");
+        Serial.print(value);
+        Serial.println(" should be sent ");
+        timer = millis();
+    }
+    
+
+    // needs to do this for some reason
+    ubidots.loop();
+
+
 }
