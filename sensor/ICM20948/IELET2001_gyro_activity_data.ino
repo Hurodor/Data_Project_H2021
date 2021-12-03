@@ -28,6 +28,11 @@ float getActivity(ICM20948_WE sensor){
   return pow((pow(gyr.x, 2)+pow(gyr.y, 2)+pow(gyr.z, 2)) , 0.5);
 }
 
+
+void takeMessurment(){
+    
+}
+
 void setup() {
   Wire.begin();
   Serial.begin(115200);
@@ -37,6 +42,7 @@ void setup() {
 
 void loop() {
   activity = getActivity(myIMU);
+  
   Serial.println(activity);
   delay(100);
 }

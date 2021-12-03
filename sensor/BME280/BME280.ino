@@ -1,5 +1,4 @@
 
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
@@ -16,15 +15,15 @@ Adafruit_BME280 bme; // I2C
 
 unsigned long delayTime;
 
+
+
 void setup() {
   Serial.begin(9600);
   Serial.println(F("BME280 test"));
 
-  bool status;
-
   // default settings
   // (you can also pass in a Wire library object like &Wire2)
-  status = bme.begin(0x76);  
+  bool status = bme.begin(0x76);  
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
     while (1);

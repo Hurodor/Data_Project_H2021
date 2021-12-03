@@ -44,8 +44,8 @@ RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE];
 
 // messurments
 const int delay_time = 100;  // time between messurments
-const int samle_size = 100;  // how manye messurments too take
-float activity_array[samle_size];
+const int sample_size = 100;  // how manye messurments too take
+float activity_array[sample_size];
 
 // glenn
 
@@ -53,6 +53,14 @@ float activity_array[samle_size];
 ICM20948_WE myIMU = ICM20948_WE(ICM20948_ADDR);
 float activity;
 
+float avgOfArray(float array[], int array_size) {
+    double sum = 0;
+    for (int i = 0; i < array_size; i++)
+    {
+        sum += array[i];
+    }
+    return sum /(double)array_size;
+  }
 
 void setupActivitySensor(ICM20948_WE sensor)
 {
@@ -82,32 +90,6 @@ float getActivity(ICM20948_WE sensor)
     xyzFloat gyr = sensor.getGyrValues();
     return pow((pow(gyr.x, 2) + pow(gyr.y, 2) + pow(gyr.z, 2)), 0.5);
 }
-
-void takeMessurment()
-// take "sample_size" number of messurments and save avg in rtc "rtc_saved_activity"
-{
-    for (int i = 0; i < sample_size; i++){
-        activity = getActivity();
-
-        // store messurments in list
-        activity_array[i] = activity;
-        delay(delay_time);
-    }
-
-    // save avg of activity in rtc
-    rtc_saved_activity[rtc_list_current_index] = avgOfArray(activity_array, samle_size);
-    // save coresponding timestamp
-    rtc_saved_timestamp[rtc_list_current_index] = time(NULL);
-}
-
-float avgOfArray(float array[], int array_size) {
-    double sum = 0;
-    for (int i = 0; i < array_size; i++)
-    {
-        sum += array[i];
-    }
-    return sum /(double)array_size;
-  }
 
 bool rtcArraysFull(int current_index, int max_size){
     if (current_index < max_size){
@@ -227,6 +209,22 @@ void pushToUbidots(char varable_label[], char device_label[], int value, char co
     ubidots.loop();
 }
 
+void takeMessurment()
+// take "sample_size" number of messurments and save avg in rtc "rtc_saved_activity"
+{
+    for (int i = 0; i < sample_size; i++){
+        activity = getActivity(myIMU);
+
+        // store messurments in list
+        activity_array[i] = activity;
+        delay(delay_time);
+    }
+
+    // save avg of activity in rtc
+    rtc_saved_activity[rtc_list_current_index] = avgOfArray(activity_array, sample_size);
+    // save coresponding timestamp
+    rtc_saved_timestamp[rtc_list_current_index] = time(NULL);
+}
 
 void sendSavedActivityToUbidots(){
 // send only when full list
@@ -238,7 +236,7 @@ void sendSavedActivityToUbidots(){
             rtc_saved_activity[i], 
             context, 
             rtc_saved_timestamp[i]
-            )
+            );
         //delay(delay_time);  delay in push-function
     }
 }
@@ -268,6 +266,7 @@ void loop(){
         // if wifi timed_out
         if (WiFi.status() != WL_CONNECTED){
             // throw package and start new sekvens
+            rtc_list_current_index = 0;  // discus if it is better to not thorw package
             goToDeepSleep();
         }
 

@@ -13,39 +13,33 @@ const char *WIFI_PASS = "123456789";							   //  password
 char *DEVICE_LABEL = "Test";								   //  Device label 
 char *VARIABLE_LABEL = "random_value";					   // Variable label
 
-
+// context variabel  "key":"value"
+char my_dict[] = "\"test\":\"this_is_new\"";
 
 Ubidots ubidots(UBIDOTS_TOKEN);
-char test[25];
 
-// ubidots parameters END
 
 
 // Clock variables
 #define NTP_SRV "time-a-b.nist.gov"
 #define NTP_TIMEOUT 30  // seconds
+#define TIME_TO_SLEEP 5  //seconds to deepsleep
 
-unsigned int wifi_timeout = 30; // secounds
-
-
+unsigned int wifi_timeout = 30; // seconds
 RTC_DATA_ATTR unsigned long lastUpdate = 0;
 
 
-// Deepsleep paramters BEGIN
-#define TIME_TO_SLEEP 5  //secounds
-
+// current loop counter
 RTC_DATA_ATTR int timer = 0;
 
 
-// storing between deepsleep data:
+// storing data between deepsleep:
 const int RTC_LIST_SIZE = 20; //how many elements can be saved in rtc memory
-
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float saved_activity[RTC_LIST_SIZE];
 RTC_DATA_ATTR unsigned long saved_timestamp[RTC_LIST_SIZE];
 
-// Deepsleep parameters END
 
 int value = 156;
 
@@ -169,11 +163,13 @@ void pushToUbidots(char varable_label[], char device_label[], int value, char co
     Serial.print(" | context: ");
     Serial.println(context);
     Serial.println();
+    
+    // time to make sure the pacage is sendt
+    delay(500);
 
     // this has to be to send (dont understand why)
     ubidots.loop();
 }
-
 
 void setup(){
     Serial.begin(115200);
@@ -199,8 +195,6 @@ void loop(){
 
         connectToUbidots();
 
-        // context variabel
-        char my_dict[] = "\"hei\":\"5\"";
 
         pushToUbidots(VARIABLE_LABEL, DEVICE_LABEL, value, my_dict, time(NULL));
 
