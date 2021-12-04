@@ -11,8 +11,8 @@
 const char *UBIDOTS_TOKEN = "BBFF-O7IdMgAv4p0AzptrTKIQGkQr1jTCZZ"; // TOKEN
 const char *WIFI_SSID = "Hurodor";								   // SSID
 const char *WIFI_PASS = "123456789";							   //  password
-char *DEVICE_LABEL = "Test";								   //  Device label 
-char *VARIABLE_LABEL = "random_value";					   // Variable label
+char *DEVICE_LABEL = "cow_necklaces";								   //  Device label 
+char *VARIABLE_LABEL = "activity";					   // Variable label
 
 // context variabel  "key":"value"
 char context[] = "\"Critical\":\"0\"";
@@ -35,7 +35,7 @@ RTC_DATA_ATTR int timer = 0;
 
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 20; //how many elements can be saved in rtc memory
+const int RTC_LIST_SIZE = 10; //how many elements can be saved in rtc memory
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float rtc_saved_activity[RTC_LIST_SIZE];
@@ -44,7 +44,7 @@ RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE];
 
 // messurments
 const int delay_time = 100;  // time between messurments
-const int sample_size = 100;  // how manye messurments too take
+const int sample_size = 10;  // how manye messurments too take
 float activity_array[sample_size];
 
 // glenn
@@ -203,7 +203,7 @@ void pushToUbidots(char varable_label[], char device_label[], int value, char co
     Serial.println();
     
     // time to make sure the pacage is sendt
-    delay(500);
+    delay(1000);
 
     // this has to be to send (dont understand why)
     ubidots.loop();
@@ -244,9 +244,17 @@ void sendSavedActivityToUbidots(){
 void setup(){
     Wire.begin();
     Serial.begin(115200);
-    while (!Serial)
-    {
+    
+    // if clock is never synced sunc clock before starting messurments
+    if (time(NULL) < 100){
+        connectToWifi(WIFI_SSID, WIFI_PASS);
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            goToDeepSleep();
+        }
+        sync_clock();
     }
+
     setupActivitySensor(myIMU);
 
     // Disconect wifi and bluethooth for powersaving
@@ -256,6 +264,10 @@ void setup(){
 void loop(){
 
     takeMessurment();
+    Serial.println();
+    Serial.print("current index: ");
+    Serial.println(rtc_list_current_index);
+    Serial.println();
 
     // if list is full
     if (rtc_list_current_index >= RTC_LIST_SIZE){

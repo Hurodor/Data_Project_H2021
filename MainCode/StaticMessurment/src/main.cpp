@@ -11,11 +11,13 @@
 const char *UBIDOTS_TOKEN = "BBFF-O7IdMgAv4p0AzptrTKIQGkQr1jTCZZ"; // TOKEN
 const char *WIFI_SSID = "Hurodor";                                 // SSID
 const char *WIFI_PASS = "123456789";                               //  password
-char *DEVICE_LABEL = "Test";                                       //  Device label
-char *VARIABLE_LABEL = "random_value";                             // Variable label
+char *DEVICE_LABEL = "climateBox";                                       //  Device label
+char *VARIABLE_LABEL_TEMP = "Temperature";                             // Variable label
+char *VARIABLE_LABEL_HUM = "Humidity";
+char *VARIABLE_LABEL_THI = "THI";
 
 // context variabel  "key":"value"
-char context[] = "\"test\":\"this_is_new\"";
+char context[] = "\"criticl\":\"0\"";
 
 Ubidots ubidots(UBIDOTS_TOKEN);
 
@@ -31,7 +33,7 @@ RTC_DATA_ATTR unsigned long lastUpdate = 0;
 RTC_DATA_ATTR int timer = 0;
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 20; // how many elements can be saved in rtc memory
+const int RTC_LIST_SIZE = 10; // how many elements can be saved in rtc memory
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float rtc_saved_humidity[RTC_LIST_SIZE];
@@ -47,12 +49,12 @@ float temp;
 float hum;
 
 // avg calculations
-const int sample_size = 100; // how many samples each to calc avg from
+const int sample_size = 10; // how many samples each to calc avg from
 float temp_array[sample_size];
 float hum_array[sample_size];
 float THI_array[sample_size];
 
-const int delay_time = 500; // time between messurments while messuring
+const int delay_time = 100; // time between messurments while messuring
 
 Adafruit_BME280 bme;
 
@@ -185,7 +187,7 @@ void pushToUbidots(char varable_label[], char device_label[], int value, char co
     Serial.println();
 
     // time to make sure the pacage is sendt
-    delay(500);
+    delay(1000);
 
     // this has to be to send (dont understand why)
     ubidots.loop();
@@ -204,13 +206,12 @@ void setupSensor()
         goToDeepSleep(); // go sleep and try again when you wake up
     }
 
-    Serial.println("-- Default Test --");
     Serial.println();
 }
 
 void takeMessurments()
 {
-
+    Serial.println("Starting messuring");
     {
         for (int i = 0; i < sample_size; i++)
         {
@@ -223,8 +224,10 @@ void takeMessurments()
             hum_array[i] = hum;
             temp_array[i] = temp;
             THI_array[i] = THI;
-
+            
+            Serial.println(i);    //debug
             delay(delay_time); // time between messurments
+            
         }
 
         // save avg of current messurments in rtc memory
@@ -246,7 +249,7 @@ void sendSavedDataToUbidots()
 
         // push humidity
         pushToUbidots(
-            VARIABLE_LABEL,
+            VARIABLE_LABEL_HUM,
             DEVICE_LABEL,
             rtc_saved_humidity[i],
             context,
@@ -254,7 +257,7 @@ void sendSavedDataToUbidots()
 
         // push temeprature
         pushToUbidots(
-            VARIABLE_LABEL,
+            VARIABLE_LABEL_TEMP,
             DEVICE_LABEL,
             rtc_saved_temperature[i],
             context,
@@ -262,7 +265,7 @@ void sendSavedDataToUbidots()
 
         // push THI
         pushToUbidots(
-            VARIABLE_LABEL,
+            VARIABLE_LABEL_THI,
             DEVICE_LABEL,
             rtc_saved_THI[i],
             context,
@@ -275,6 +278,17 @@ void setup()
 {
     Serial.begin(115200);
 
+
+    // if clock is never synced sunc clock before starting messurments
+    if (time(NULL) < 100){
+        connectToWifi(WIFI_SSID, WIFI_PASS);
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            goToDeepSleep();
+        }
+        sync_clock();
+    }
+
     // Disconect wifi and bluethoot for powersaving
     disconctUnwantedServices();
 
@@ -284,10 +298,11 @@ void setup()
 
 void loop()
 {
-
     takeMessurments();
-    Serial.print("current index");
+    Serial.println();
+    Serial.print("current index: ");
     Serial.println(rtc_list_current_index);
+    Serial.println();
 
     // if list is full
     if (rtc_list_current_index >= RTC_LIST_SIZE)
@@ -301,6 +316,8 @@ void loop()
         {
             // throw package and start new sekvens
             rtc_list_current_index = 0; // discus if it is better to not thorw package
+            // best way to handle packet loss
+            // backup data, and send new and old list next
             goToDeepSleep();
         }
 
