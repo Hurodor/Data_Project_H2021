@@ -35,7 +35,7 @@ RTC_DATA_ATTR int timer = 0;
 
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 10; //how many elements can be saved in rtc memory
+const int RTC_LIST_SIZE = 5; //how many elements can be saved in rtc memory
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float rtc_saved_activity[RTC_LIST_SIZE];
@@ -48,10 +48,14 @@ const int sample_size = 10;  // how manye messurments too take
 float activity_array[sample_size];
 
 // glenn
-
 #define ICM20948_ADDR 0x68
 ICM20948_WE myIMU = ICM20948_WE(ICM20948_ADDR);
 float activity;
+
+//case variables
+int critical = 1337;
+bool send = false;
+int elements_to_send = RTC_LIST_SIZE;
 
 float avgOfArray(float array[], int array_size) {
     double sum = 0;
@@ -61,6 +65,22 @@ float avgOfArray(float array[], int array_size) {
     }
     return sum /(double)array_size;
   }
+
+// Function to copy 'len' elements from 'src' to 'dst'
+void copy(int* src, int* dst, int len) {
+    memcpy(dst, src, sizeof(src[0])*len);
+}
+
+void printList(float array[], const int size){
+    
+    Serial.println("printing list");
+    for (int i = 0; i < size; i++){
+        Serial.print("index: ");
+        Serial.print(i);
+        Serial.print(" | ");
+        Serial.println(array[i]);
+    }
+}
 
 void setupActivitySensor(ICM20948_WE sensor)
 {
@@ -72,11 +92,8 @@ void setupActivitySensor(ICM20948_WE sensor)
     {
         Serial.println("ICM20948 is connected");
     }
-
-    Serial.println("Position your ICM20948 flat and don't move it - calibrating...");
     delay(1000);
     myIMU.autoOffsets();
-    Serial.println("Done!");
 
     myIMU.enableAcc(false);
 
@@ -175,7 +192,7 @@ void connectToUbidots(){
     ubidots.reconnect();
 }
 
-void pushToUbidots(char varable_label[], char device_label[], int value, char context[], unsigned long timestamp){
+void pushToUbidots(char varable_label[], char device_label[], float value, char context[], unsigned long timestamp){
 
     if (!ubidots.connected())
 	    {
@@ -209,7 +226,7 @@ void pushToUbidots(char varable_label[], char device_label[], int value, char co
     ubidots.loop();
 }
 
-void takeMessurment()
+float takeMessurment()
 // take "sample_size" number of messurments and save avg in rtc "rtc_saved_activity"
 {
     for (int i = 0; i < sample_size; i++){
@@ -221,15 +238,24 @@ void takeMessurment()
     }
 
     // save avg of activity in rtc
-    rtc_saved_activity[rtc_list_current_index] = avgOfArray(activity_array, sample_size);
+    float avg_activity = avgOfArray(activity_array, sample_size);
+
+    rtc_saved_activity[rtc_list_current_index] = avg_activity;
+
     // save coresponding timestamp
     rtc_saved_timestamp[rtc_list_current_index] = time(NULL);
+
+    Serial.println();
+    Serial.print("activity: ");
+    Serial.println(rtc_saved_activity[rtc_list_current_index]);
+
+    return avg_activity;
 }
 
-void sendSavedActivityToUbidots(){
+void sendSavedActivityToUbidots(char context[],int list_size){
 // send only when full list
 // make sure connection to ubidots is estahblished before sending!
-    for (int i = 0; i < RTC_LIST_SIZE; i++){
+    for (int i = 0; i < list_size; i++){
         pushToUbidots(
             VARIABLE_LABEL, 
             DEVICE_LABEL, 
@@ -240,6 +266,7 @@ void sendSavedActivityToUbidots(){
         //delay(delay_time);  delay in push-function
     }
 }
+
 
 void setup(){
     Wire.begin();
@@ -259,18 +286,57 @@ void setup(){
 
     // Disconect wifi and bluethooth for powersaving
     disconctUnwantedServices();
+    delay(100);
 }
+
 
 void loop(){
 
-    takeMessurment();
+    
+    float current_messurment = takeMessurment();
+    
     Serial.println();
     Serial.print("current index: ");
     Serial.println(rtc_list_current_index);
     Serial.println();
 
-    // if list is full
+    // update index counter
+    rtc_list_current_index += 1;
+    
+    // if list is full send
     if (rtc_list_current_index >= RTC_LIST_SIZE){
+        critical = 0;
+    }
+    // threshold value
+    else if (current_messurment < 1){
+        critical = 1;
+    }
+
+    //normal send
+    else { critical = 1337; }
+
+    switch (critical)
+    {
+        
+    case 0:  // normal send
+        send = true;
+        elements_to_send = RTC_LIST_SIZE;
+        break;
+        
+    case 1:  // critcal send
+        send = true;
+        elements_to_send = rtc_list_current_index;
+        break;
+        
+    default: // wake up and take messurment
+        send = false;
+        break;
+    }
+
+
+    delay(200);
+    // if list is full
+    if (send){
         
         // connect to wifi
         connectToWifi(WIFI_SSID, WIFI_PASS);
@@ -285,15 +351,15 @@ void loop(){
         sync_clock();
         connectToUbidots();
 
-        sendSavedActivityToUbidots();
+        sendSavedActivityToUbidots(context, elements_to_send);
 
         // reset index counter
         rtc_list_current_index = 0;
     }
 
-    // update index counter
-    rtc_list_current_index += 1;
+    
     // go sleep
+    printList(rtc_saved_activity, RTC_LIST_SIZE);
     goToDeepSleep();
 }
 
