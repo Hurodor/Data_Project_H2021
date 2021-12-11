@@ -33,7 +33,7 @@ RTC_DATA_ATTR unsigned long lastUpdate = 0;
 RTC_DATA_ATTR int timer = 0;
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 10; // how many elements can be saved in rtc memory
+const int RTC_LIST_SIZE = 5; // how many elements can be saved in rtc memory
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float rtc_saved_humidity[RTC_LIST_SIZE];
@@ -48,13 +48,28 @@ float THI;
 float temp;
 float hum;
 
+const int delay_time = 100; // time between messurments while messuring
+
 // avg calculations
 const int sample_size = 10; // how many samples each to calc avg from
 float temp_array[sample_size];
 float hum_array[sample_size];
 float THI_array[sample_size];
 
-const int delay_time = 100; // time between messurments while messuring
+// datatype for returning all variables from messurments function
+struct messurments{
+    float temperature;
+    float humidity;
+    float THI;
+};
+
+
+// case variables
+int critical = 1337;
+bool send = false;
+int elements_to_send = RTC_LIST_SIZE;
+
+
 
 Adafruit_BME280 bme;
 
@@ -158,7 +173,7 @@ void connectToUbidots()
     ubidots.reconnect();
 }
 
-void pushToUbidots(char varable_label[], char device_label[], int value, char context[], unsigned long timestamp)
+void pushToUbidots(char varable_label[], char device_label[], float value, char context[], unsigned long timestamp)
 {
 
     if (!ubidots.connected())
@@ -209,10 +224,10 @@ void setupSensor()
     Serial.println();
 }
 
-void takeMessurments()
+messurments takeMessurments()
 {
     Serial.println("Starting messuring");
-    {
+    
         for (int i = 0; i < sample_size; i++)
         {
             // read data
@@ -230,21 +245,31 @@ void takeMessurments()
             
         }
 
+        // calculating avg
+        float humidity = avgOfArray(hum_array, sample_size);
+        float temperature = avgOfArray(temp_array, sample_size);
+        float THI = avgOfArray(THI_array, sample_size);
+
+        // packing return values
+        messurments messurments = {humidity, temperature, THI};
+
+
         // save avg of current messurments in rtc memory
-        rtc_saved_humidity[rtc_list_current_index] = avgOfArray(hum_array, sample_size);
-        rtc_saved_temperature[rtc_list_current_index] = avgOfArray(temp_array, sample_size);
-        rtc_saved_THI[rtc_list_current_index] = avgOfArray(THI_array, sample_size);
+        rtc_saved_humidity[rtc_list_current_index] = humidity;
+        rtc_saved_temperature[rtc_list_current_index] = temperature;
+        rtc_saved_THI[rtc_list_current_index] = THI;
 
         // save coresponding timestamp
         rtc_saved_timestamp[rtc_list_current_index] = time(NULL);
-    }
+        
+        return messurments;
 }
 
-void sendSavedDataToUbidots()
+void sendSavedDataToUbidots(char context[], int list_size)
 {
     // send only when full list
     // make sure connection to ubidots is estahblished before sending!
-    for (int i = 0; i < RTC_LIST_SIZE; i++)
+    for (int i = 0; i < list_size; i++)
     {
 
         // push humidity
@@ -298,14 +323,52 @@ void setup()
 
 void loop()
 {
-    takeMessurments();
+    messurments current_messurment = takeMessurments();
+
     Serial.println();
     Serial.print("current index: ");
     Serial.println(rtc_list_current_index);
     Serial.println();
+    
+    // update index counter
+    rtc_list_current_index += 1;
 
+
+    // if list is full send
+    if (rtc_list_current_index >= RTC_LIST_SIZE){
+        critical = 0;
+    }
+
+    // threshold values
+    else if (current_messurment.THI > 72 || current_messurment.temperature < 5){
+        critical = 1;
+    }
+
+    else { critical = 1337; }
+
+
+    switch (critical)
+    {
+        
+    case 0:  // normal send
+        send = true;
+        elements_to_send = RTC_LIST_SIZE;
+        break;
+        
+    case 1:  // critcal send
+        send = true;
+        elements_to_send = rtc_list_current_index;
+        break;
+        
+    default: // wake up and take messurment
+        send = false;
+        break;
+    }
+
+
+    delay(200);
     // if list is full
-    if (rtc_list_current_index >= RTC_LIST_SIZE)
+    if (send)
     {
 
         // connect to wifi
@@ -326,16 +389,14 @@ void loop()
         connectToUbidots();
 
         // send data
-        sendSavedDataToUbidots();
+        sendSavedDataToUbidots(context, elements_to_send);
 
         // reset index counter
         rtc_list_current_index = 0;
 
         goToDeepSleep();
     }
-
-    // update index counter
-    rtc_list_current_index += 1;
+    
     // go sleep
     goToDeepSleep();
 }
