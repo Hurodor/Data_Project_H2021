@@ -51,7 +51,7 @@ float hum;
 const int delay_time = 100; // time between messurments while messuring
 
 // avg calculations
-const int sample_size = 10; // how many samples each to calc avg from
+const int sample_size = 100; // how many samples each to calc avg from
 float temp_array[sample_size];
 float hum_array[sample_size];
 float THI_array[sample_size];
