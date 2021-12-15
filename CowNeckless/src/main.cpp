@@ -47,7 +47,7 @@ const int delay_time = 100;  // time between messurments
 const int sample_size = 10;  // how manye messurments too take
 float activity_array[sample_size];
 
-// glenn
+// sensor
 #define ICM20948_ADDR 0x68
 ICM20948_WE myIMU = ICM20948_WE(ICM20948_ADDR);
 float activity;
@@ -139,7 +139,7 @@ void setupActivitySensor(ICM20948_WE sensor)
     {
         Serial.println("ICM20948 is connected");
     }
-    myIMU.setGyrOffsets(0.0, 0.0, 0.0); // After running findGyroOffsets(), replace these values with produced values from function
+    myIMU.setGyrOffsets(73.11, 49.81, 22.18); // After running findGyroOffsets(), replace these values with produced values from function
     //myIMU.setGyrOffsets(X offset, Y offset, Z offset);
 
     myIMU.enableAcc(false);
@@ -330,6 +330,7 @@ void setup(){
     }
 
     setupActivitySensor(myIMU);
+    //findGyroOffsets(myIMU);
 
     // Disconect wifi and bluethooth for powersaving
     disconctUnwantedServices();
@@ -339,7 +340,7 @@ void setup(){
 
 void loop(){
 
-    
+       
     float current_messurment = takeMessurment();
     
     Serial.println();
