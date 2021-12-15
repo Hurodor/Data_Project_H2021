@@ -82,6 +82,53 @@ void printList(float array[], const int size){
     }
 }
 
+void findGyroOffsets(ICM20948_WE sensor){
+    /*When using this function it is very important that the sensor is sitting flat on a lever surface.
+    Avoid any disturbance of the sensor while the function is running.
+    The values printed out at the end should be entered into the 'setGyrOffsets' function within the 'setupActivitySensor' function
+    This function has to be used for each individual ICM20948 that is to be used, as the offsets can vary.*/
+    float x_offset;
+    float y_offset;
+    float z_offset;
+
+    long timer = 300000; // 5 minutes in milliseconds
+    unsigned long start = millis();
+
+    Serial.print("Starting 5 minute timer to stabilize sensor temperature");
+    while ((millis()-start)<timer){
+      sensor.readSensor(); // The sensor is reading measurements but not using them, this is only to get it to it's operating temperature
+      delay(100);
+      Serial.print('.'); // Serial output to show that function is running.
+    }
+    Serial.println();
+    
+    Serial.print("Calculating offsets");
+    // Take 100 measurements over a time of ~1 second
+    for (int i = 0; i < 100; ++i){
+      sensor.readSensor();
+      xyzFloat gyrRaw = sensor.getGyrRawValues();
+      x_offset += gyrRaw.x; // Sum up each measurement for later averaging.
+      y_offset += gyrRaw.y;
+      z_offset += gyrRaw.z;
+      delay(10);
+      Serial.print('.'); // Serial output to show that function is running.
+    }
+    Serial.println();
+    Serial.println("Done.");
+    
+    // Average the sum of 100 measurements to get the average offset.
+    x_offset = x_offset/100.0;
+    y_offset = y_offset/100.0;
+    z_offset = z_offset/100.0;
+
+    Serial.print("X offset = ");
+    Serial.print(x_offset);
+    Serial.print(", Y offset = ");
+    Serial.print(y_offset);
+    Serial.print(", Z offset = ");
+    Serial.print(z_offset);
+}
+
 void setupActivitySensor(ICM20948_WE sensor)
 {
     if (!myIMU.init())
@@ -92,8 +139,8 @@ void setupActivitySensor(ICM20948_WE sensor)
     {
         Serial.println("ICM20948 is connected");
     }
-    delay(1000);
-    myIMU.autoOffsets();
+    myIMU.setGyrOffsets(0.0, 0.0, 0.0); // After running findGyroOffsets(), replace these values with produced values from function
+    //myIMU.setGyrOffsets(X offset, Y offset, Z offset);
 
     myIMU.enableAcc(false);
 
