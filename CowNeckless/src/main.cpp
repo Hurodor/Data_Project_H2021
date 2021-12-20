@@ -14,17 +14,16 @@ const char *WIFI_PASS = "123456789";							   //  password
 char *DEVICE_LABEL = "cow_necklaces";								   //  Device label 
 char *VARIABLE_LABEL = "activity";					   // Variable label
 
-// context variabel  "key":"value"
+// context variabel  "key":"value" (need context to send timestamp to ubidots)
 char context[] = "\"Critical\":\"0\"";
 
 Ubidots ubidots(UBIDOTS_TOKEN);
 
 
-
 // Clock variables
 #define NTP_SRV "time-a-b.nist.gov"
 #define NTP_TIMEOUT 30  // seconds
-#define TIME_TO_SLEEP 5  //seconds to deepsleep
+#define TIME_TO_SLEEP 60  //seconds to deepsleep
 
 unsigned int wifi_timeout = 30; // seconds
 RTC_DATA_ATTR unsigned long lastUpdate = 0;
@@ -35,19 +34,19 @@ RTC_DATA_ATTR int timer = 0;
 
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 5; //how many elements can be saved in rtc memory
+const int RTC_LIST_SIZE = 60; //how many elements can be saved in rtc memory
 RTC_DATA_ATTR int rtc_list_current_index = 0;
 
 RTC_DATA_ATTR float rtc_saved_activity[RTC_LIST_SIZE];
 RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE];
 
 
-// messurments
+// messurment variables
 const int delay_time = 100;  // time between messurments
 const int sample_size = 10;  // how manye messurments too take
 float activity_array[sample_size];
 
-// sensor
+// sensor variables
 #define ICM20948_ADDR 0x68
 ICM20948_WE myIMU = ICM20948_WE(ICM20948_ADDR);
 float activity;
@@ -58,6 +57,7 @@ bool send = false;
 int elements_to_send = RTC_LIST_SIZE;
 
 float avgOfArray(float array[], int array_size) {
+    // calculate avg of list and returns value
     double sum = 0;
     for (int i = 0; i < array_size; i++)
     {
@@ -66,12 +66,8 @@ float avgOfArray(float array[], int array_size) {
     return sum /(double)array_size;
   }
 
-// Function to copy 'len' elements from 'src' to 'dst'
-void copy(int* src, int* dst, int len) {
-    memcpy(dst, src, sizeof(src[0])*len);
-}
-
 void printList(float array[], const int size){
+    // print function to debug
     
     Serial.println("printing list");
     for (int i = 0; i < size; i++){
@@ -130,6 +126,7 @@ void findGyroOffsets(ICM20948_WE sensor){
 }
 
 void setupActivitySensor(ICM20948_WE sensor)
+// configre sensor
 {
     if (!myIMU.init())
     {
@@ -149,20 +146,16 @@ void setupActivitySensor(ICM20948_WE sensor)
 }
 
 float getActivity(ICM20948_WE sensor)
+// take one messurment of acticity
 {
     sensor.readSensor();
     xyzFloat gyr = sensor.getGyrValues();
     return pow((pow(gyr.x, 2) + pow(gyr.y, 2) + pow(gyr.z, 2)), 0.5);
 }
 
-bool rtcArraysFull(int current_index, int max_size){
-    if (current_index < max_size){
-        return false;
-    }
-    return true;
-}
 
 void connectToWifi(const char* WIFI_SSID, const char* WIFI_PASS){
+    // connect to wifi
     
     // local timeout variables
     int timer = 0;
@@ -193,6 +186,7 @@ void connectToWifi(const char* WIFI_SSID, const char* WIFI_PASS){
 }
 
 void sync_clock(){
+    //sync rtc clock with real time 
 
     struct tm tm_now;
     configTime(0, 0, NTP_SRV); //UTC time
@@ -233,13 +227,13 @@ void goToDeepSleep()
 
 void connectToUbidots(){
     // this function connect to ubidots MQTT broker
-    // mabye add wifi configurations also
 
     ubidots.setup();
     ubidots.reconnect();
 }
 
 void pushToUbidots(char varable_label[], char device_label[], float value, char context[], unsigned long timestamp){
+    // send one value to ubidots
 
     if (!ubidots.connected())
 	    {
@@ -355,7 +349,7 @@ void loop(){
     if (rtc_list_current_index >= RTC_LIST_SIZE){
         critical = 0;
     }
-    // threshold value
+    // threshold value send
     else if (current_messurment < 1){
         critical = 1;
     }

@@ -12,51 +12,52 @@ const char *UBIDOTS_TOKEN = "BBFF-O7IdMgAv4p0AzptrTKIQGkQr1jTCZZ"; // TOKEN
 const char *WIFI_SSID = "Hurodor";                                 // SSID
 const char *WIFI_PASS = "123456789";                               //  password
 char *DEVICE_LABEL = "climateBox";                                       //  Device label
-char *VARIABLE_LABEL_TEMP = "Temperature";                             // Variable label
-char *VARIABLE_LABEL_HUM = "Humidity";
+char *VARIABLE_LABEL_TEMP = "Temperature";                             
+char *VARIABLE_LABEL_HUM = "Humidity";                                      
 char *VARIABLE_LABEL_THI = "THI";
 
-// context variabel  "key":"value"
+// context variabel  "key":"value" (have to send context in ubidots to send timestamp)
 char context[] = "\"criticl\":\"0\"";
 
+//Ubidots object
 Ubidots ubidots(UBIDOTS_TOKEN);
 
 // Clock variables
-#define NTP_SRV "time-a-b.nist.gov"
-#define NTP_TIMEOUT 30  // seconds
-#define TIME_TO_SLEEP 5 // seconds to deepsleep
+#define NTP_SRV "time-a-b.nist.gov" // ntb server
+#define NTP_TIMEOUT 30  // seconds to timeout when syncing clock
+#define TIME_TO_SLEEP 300 // seconds to be in deepsleep
 
-unsigned int wifi_timeout = 30; // seconds
+unsigned int wifi_timeout = 30; // wifi timeout in secounds 
 RTC_DATA_ATTR unsigned long lastUpdate = 0;
 
 // current loop counter
 RTC_DATA_ATTR int timer = 0;
 
 // storing data between deepsleep:
-const int RTC_LIST_SIZE = 5; // how many elements can be saved in rtc memory
-RTC_DATA_ATTR int rtc_list_current_index = 0;
+const int RTC_LIST_SIZE = 12; // how many elements can be saved in rtc memory
+RTC_DATA_ATTR int rtc_list_current_index = 0;   //current index to store and work in RTC list
 
-RTC_DATA_ATTR float rtc_saved_humidity[RTC_LIST_SIZE];
-RTC_DATA_ATTR float rtc_saved_temperature[RTC_LIST_SIZE];
-RTC_DATA_ATTR float rtc_saved_THI[RTC_LIST_SIZE];
+RTC_DATA_ATTR float rtc_saved_humidity[RTC_LIST_SIZE];  // RTC humidity list
+RTC_DATA_ATTR float rtc_saved_temperature[RTC_LIST_SIZE];   // RTC temperature list
+RTC_DATA_ATTR float rtc_saved_THI[RTC_LIST_SIZE];   //THI RTC list
 
-RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE];
+RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE]; // saved timestamp
 
-// messurments
+// messurments variable
 #define SEALEVELPRESSURE_HPA (1013.25)
 float THI;
 float temp;
 float hum;
 
-const int delay_time = 100; // time between messurments while messuring
+const int delay_time = 100; // time between messurments while messuring data
 
 // avg calculations
-const int sample_size = 100; // how many samples each to calc avg from
+const int sample_size = 10; // how many samples each to calc avg from
 float temp_array[sample_size];
 float hum_array[sample_size];
 float THI_array[sample_size];
 
-// datatype for returning all variables from messurments function
+// datatype for returning all variables from messurments function (custom list object)
 struct messurments{
     float temperature;
     float humidity;
@@ -64,16 +65,16 @@ struct messurments{
 };
 
 
-// case variables
+// case variables for implementing critical values
 int critical = 1337;
 bool send = false;
 int elements_to_send = RTC_LIST_SIZE;
 
 
-
 Adafruit_BME280 bme;
 
 float avgOfArray(float array[], int array_size)
+// this calculates the avrage of a list of floats
 {
     double sum = 0;
     for (int i = 0; i < array_size; i++)
@@ -83,16 +84,9 @@ float avgOfArray(float array[], int array_size)
     return sum / (double)array_size;
 }
 
-bool rtcArraysFull(int current_index, int max_size)
-{
-    if (current_index < max_size)
-    {
-        return false;
-    }
-    return true;
-}
 
 void connectToWifi(const char *WIFI_SSID, const char *WIFI_PASS)
+// this connects to wifi
 {
 
     // local timeout variables
@@ -101,7 +95,7 @@ void connectToWifi(const char *WIFI_SSID, const char *WIFI_PASS)
 
     // try connect
     WiFi.begin(WIFI_SSID, WIFI_PASS);
-    while (WiFi.status() != WL_CONNECTED)
+    while (WiFi.status() != WL_CONNECTED) // if not connected after (timeout) secounds cancle connection
     {
         delay(500);
         Serial.print(".");
@@ -109,7 +103,7 @@ void connectToWifi(const char *WIFI_SSID, const char *WIFI_PASS)
         timer += 1;
         if (timer >= timeout)
         {
-            break;
+            break;  
         };
     }
 
@@ -126,6 +120,7 @@ void connectToWifi(const char *WIFI_SSID, const char *WIFI_PASS)
 }
 
 void sync_clock()
+// this function syncs RTC clock with real time
 {
 
     struct tm tm_now;
@@ -142,6 +137,7 @@ void sync_clock()
 }
 
 void disconctUnwantedServices()
+// powersaving measures
 {
     // disconect bluethoot and wifi
     WiFi.disconnect(true);
@@ -153,6 +149,7 @@ void disconctUnwantedServices()
 }
 
 void goToDeepSleep()
+// this sets esp in deepsleep
 {
     Serial.println("Going to sleep...");
 
@@ -167,6 +164,7 @@ void goToDeepSleep()
 }
 
 void connectToUbidots()
+// connects to ubidots
 {
 
     ubidots.setup();
@@ -174,6 +172,7 @@ void connectToUbidots()
 }
 
 void pushToUbidots(char varable_label[], char device_label[], float value, char context[], unsigned long timestamp)
+// send data to ubidots and print
 {
 
     if (!ubidots.connected())
@@ -209,6 +208,7 @@ void pushToUbidots(char varable_label[], char device_label[], float value, char 
 }
 
 void setupSensor()
+// configure sensor
 {
     Serial.println(F("BME280 test"));
 
@@ -225,6 +225,7 @@ void setupSensor()
 }
 
 messurments takeMessurments()
+// takes messurments and returns avg 
 {
     Serial.println("Starting messuring");
     
@@ -323,6 +324,7 @@ void setup()
 
 void loop()
 {
+    // take messurment
     messurments current_messurment = takeMessurments();
 
     Serial.println();
@@ -343,10 +345,10 @@ void loop()
     else if (current_messurment.THI > 72 || current_messurment.temperature < 5){
         critical = 1;
     }
-
+    // go to defalut
     else { critical = 1337; }
 
-
+    // switch case for what action to do
     switch (critical)
     {
         
