@@ -9,8 +9,8 @@
 
 // ubidots parameters BEGIN
 const char *UBIDOTS_TOKEN = "BBFF-O7IdMgAv4p0AzptrTKIQGkQr1jTCZZ"; // TOKEN
-const char *WIFI_SSID = "Hurodor";                                 // SSID
-const char *WIFI_PASS = "123456789";                               //  password
+const char *WIFI_SSID = "network_ssid";                                 // SSID
+const char *WIFI_PASS = "network_pass";                               //  password
 char *DEVICE_LABEL = "climateBox";                                       //  Device label
 char *VARIABLE_LABEL_TEMP = "Temperature";                             
 char *VARIABLE_LABEL_HUM = "Humidity";                                      
