@@ -43,13 +43,19 @@ RTC_DATA_ATTR unsigned long rtc_saved_timestamp[RTC_LIST_SIZE];
 
 // messurment variables
 const int delay_time = 100;  // time between messurments
-const int sample_size = 10;  // how manye messurments too take
+const int sample_size = 10;  // how many messurments too take
 float activity_array[sample_size];
 
 // sensor variables
 #define ICM20948_ADDR 0x68
 ICM20948_WE myIMU = ICM20948_WE(ICM20948_ADDR);
 float activity;
+
+// sensor testing/analyzing variables
+float minimum_value = 10000.0; // Set high to ensure updating right away
+float maximum_value = -1.0;    // Set low to ensure updating right away
+bool start_average_min_max = false;  // Variable for enabling minimum and maximum average values
+int averaging_index = 0;       // Keeps track of current index for keeping a running average
 
 //case variables
 int critical = 1337;
@@ -76,6 +82,44 @@ void printList(float array[], const int size){
         Serial.print(" | ");
         Serial.println(array[i]);
     }
+}
+
+void getMinAndMaxValue(float data_value, float &min_val, float &max_val){
+    // update and print the min and max values (for activity testing) 
+    if (data_value < min_val){
+        min_val = data_value;
+    }
+    if (data_value > max_val){
+        max_val = data_value;
+    }
+    Serial.print("Min: ");
+    Serial.print(min_val);
+    Serial.print(" - Max: ");
+    Serial.println(max_val);
+}
+
+void runningAverage(float data_value, int &index, float &min_val, float &max_val){
+    /* Print the running average at each measurement and keep track of the maximum and
+    minimum average values. */
+    float average = 0;                  // reset average value
+    activity_array[index] = data_value; // set activity_array index value to lates value 
+    index += 1;
+    if (index >= sample_size){          // Once all indexes of array are filled
+        index = 0;                      //  the index is set back to 0 to repeat cycle.
+        start_average_min_max = true;   // Set boolean to true to enable to getMinAndMaxValue
+    }                                   //  function. If the function is enabled from start, the
+                                        //  min and max values may be biased.
+    for (int i = 0; i < 10; ++i){
+        average += activity_array[i];   // Average the content of the full array for each new
+    }                                   //  data_value. This means that the first 10 average
+    average = average/sample_size;      //  values are invalid, as not all indexes are filled.
+
+    if(start_average_min_max == true){
+        getMinAndMaxValue(average, min_val, max_val);
+    }
+    
+    Serial.print("Average: ");
+    Serial.println(average);
 }
 
 void findGyroOffsets(ICM20948_WE sensor){
@@ -125,9 +169,8 @@ void findGyroOffsets(ICM20948_WE sensor){
     Serial.print(z_offset);
 }
 
-void setupActivitySensor(ICM20948_WE sensor)
-// configre sensor
-{
+void setupActivitySensor(ICM20948_WE sensor){
+    // configure sensor
     if (!myIMU.init())
     {
         Serial.println("ICM20948 does not respond");
@@ -145,9 +188,8 @@ void setupActivitySensor(ICM20948_WE sensor)
     myIMU.setGyrDLPF(ICM20948_DLPF_6);
 }
 
-float getActivity(ICM20948_WE sensor)
-// take one messurment of acticity
-{
+float getActivity(ICM20948_WE sensor){
+    // take one measurement of activity
     sensor.readSensor();
     xyzFloat gyr = sensor.getGyrValues();
     return pow((pow(gyr.x, 2) + pow(gyr.y, 2) + pow(gyr.z, 2)), 0.5);
