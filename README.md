@@ -3,5 +3,6 @@ Prosjektet består av to deler:
   -cowNecless
   -climateBox
   
- Hovedkoden for begge finnes i src/main.cpp i prosjektmappen.
+ Hovedkoden for aktivitetsmonitoreringen ligger i cowNecless/src/main.cpp
  
+ Hovedkoden for klimamonitoreringen ligger i climatebox/src/main.cpp
