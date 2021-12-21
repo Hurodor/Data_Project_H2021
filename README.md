@@ -5,4 +5,4 @@ Prosjektet består av to deler:
   
  Hovedkoden for aktivitetsmonitoreringen ligger i CowNeckless/src/main.cpp
  
- Hovedkoden for klimamonitoreringen ligger i climatebox/src/main.cpp
+ Hovedkoden for klimamonitoreringen ligger i ClimateBox/src/main.cpp
